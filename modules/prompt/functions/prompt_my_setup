@@ -1,0 +1,150 @@
+#
+# A theme based on Steve Losh's Extravagant Prompt with vcs_info integration.
+#
+# Authors:
+#   Steve Losh <steve@stevelosh.com>
+#   Bart Trojanowski <bart@jukie.net>
+#   Brian Carper <brian@carper.ca>
+#   my <my@gmail.com>
+#   Sorin Ionescu <sorin.ionescu@gmail.com>
+#
+# Screenshots:
+#   http://i.imgur.com/HyRvv.png
+#
+
+# Google Cloud Platform: info
+gcp_info() {
+  if [ -f "$HOME/.config/gcloud/active_config" ]; then
+    gcp_profile=$(cat $HOME/.config/gcloud/active_config)
+    gcp_project=$(awk '/project/{print $3}' $HOME/.config/gcloud/configurations/config_$gcp_profile)
+    if [ ! -z ${gcp_project} ]; then
+      echo "${_prompt_my_colors[1]}ⓖ %f${gcp_project}"
+    fi
+  fi
+}
+
+# Kubernetes: info
+k8s_info() {
+  if [ ! -z ${KUBECONFIG} ]; then
+    k8s_context=$(awk '/current-context/{print $2}' $KUBECONFIG)
+  elif [ -f "$HOME/.kube/config" ]; then
+    k8s_context=$(awk '/current-context/{print $2}' $HOME/.kube/config)
+  fi
+  if [ ! -z ${k8s_context} ]; then
+    echo "${_prompt_my_colors[1]}⎈ %f%B${k8s_context}%b"
+  fi
+}
+
+
+# 
+function prompt_my_precmd {
+  # Check for untracked files or updated submodules since vcs_info does not.
+  # 追跡されていないファイルがある場合
+  if [[ -n $(git ls-files --other --exclude-standard 2> /dev/null) ]]; then
+    # branch_format="(${_prompt_my_colors[1]}%b%f%u%c${_prompt_my_colors[4]}●%f)"
+    branch_format="(${_prompt_my_colors[1]}%b%f%u%f%c%f)"
+  else
+    branch_format="(${_prompt_my_colors[1]}%b%f%u%c)"
+  fi
+
+  zstyle ':vcs_info:*:prompt:*' formats "${branch_format}"
+
+  vcs_info 'prompt'
+
+  # pwd format.
+  _prompt_my_pwd=$(prompt-pwd)
+
+  # show cloud information
+  # _my_cloudinfo=$(k8s_info)
+  _my_cloudinfo=$(gcp_info)
+
+  if (( $+functions[python-info] )); then
+    python-info
+  fi
+}
+
+function prompt_my_setup {
+  setopt LOCAL_OPTIONS
+  unsetopt XTRACE KSH_ARRAYS
+  prompt_opts=(cr percent sp subst)
+
+  # Load required functions.
+  autoload -Uz add-zsh-hook
+  autoload -Uz vcs_info
+
+  # Add hook for calling vcs_info before each command.
+  add-zsh-hook precmd prompt_my_precmd
+
+  # Use extended color pallete if available.
+  if [[ $TERM = *256color* || $TERM = *rxvt* ]]; then
+    _prompt_my_colors=(
+      "%F{81}"  # Turquoise
+      "%F{166}" # Orange
+      "%F{135}" # Purple
+      "%F{161}" # Hotpink
+      "%F{118}" # Limegreen
+    )
+  else
+    _prompt_my_colors=(
+      "%F{cyan}"
+      "%F{yellow}"
+      "%F{magenta}"
+      "%F{red}"
+      "%F{green}"
+    )
+  fi
+
+  # Formats:
+  #   %b - branchname
+  #   %u - unstagedstr (see below)
+  #   %c - stagedstr (see below)
+  #   %a - action (e.g. rebase-i)
+  #   %R - repository path
+  #   %S - path in the repository
+  # local branch_format="(${_prompt_my_colors[1]}%b%f%u%c)"
+  #local action_format="(${_prompt_my_colors[5]}%a%f)"
+  #local unstaged_format="${_prompt_my_colors[2]}-%f"
+  #local staged_format="${_prompt_my_colors[5]}+%f"
+
+  # Set vcs_info parameters.
+  #zstyle ':vcs_info:*' enable bzr git hg svn
+  #zstyle ':vcs_info:*:prompt:*' check-for-changes true
+  #zstyle ':vcs_info:*:prompt:*' unstagedstr "${unstaged_format}"
+  #zstyle ':vcs_info:*:prompt:*' stagedstr "${staged_format}"
+  #zstyle ':vcs_info:*:prompt:*' actionformats "${branch_format}${action_format}"
+  #zstyle ':vcs_info:*:prompt:*' formats "${branch_format}"
+  #zstyle ':vcs_info:*:prompt:*' nvcsformats   ""
+
+
+  zstyle ':vcs_info:*' enable bzr git hg svn
+  zstyle ':vcs_info:*:prompt:*' check-for-changes true
+  zstyle ':vcs_info:*:prompt:*' stagedstr "%F{yellow}!"
+  zstyle ':vcs_info:*:prompt:*' unstagedstr "%F{red}+"
+  zstyle ':vcs_info:*' formats "%F{green}%c%u[%b]%f"
+  zstyle ':vcs_info:*' actionformats '[%b|%a]'
+
+  # Set python-info parameters.
+  zstyle ':prezto:module:python:info:virtualenv' format '(%v)'
+
+  # Set prompt .
+  zstyle ':prezto:module:editor:info:keymap:primary' format '%B%F{1}❯%F{3}❯%F{2}❯%f%b'
+
+  _prompt_my_pwd=''
+
+  # Define prompts.
+  PROMPT="${_prompt_my_colors[3]}%n%f at ${_prompt_my_colors[2]}%m%f in ${_prompt_my_colors[5]}"'${_prompt_my_pwd}%f'" "'${_my_cloudinfo}%f'" "'${vcs_info_msg_0_}'"
+"'$python_info[virtualenv]'""'${editor_info[keymap]}'" "
+  RPROMPT=''
+
+  # PROMPT='${SSH_TTY:+"%F{9}%n%f%F{7}@%f%F{3}%m%f "}%F{4}${_prompt_sorin_pwd}%(!. %B%F{1}#%f%b.)${editor_info[keymap]}'
+ 
+
+#   PROMPT="
+#${_prompt_my_colors[3]}%n%f at ${_prompt_my_colors[2]}%m%f in ${_prompt_my_colors[5]}%~%f "'${vcs_info_msg_0_}'"
+#"'$python_info[virtualenv]'"$ "
+
+
+
+}
+
+prompt_my_setup "$@"
